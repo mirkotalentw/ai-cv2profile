@@ -118,7 +118,7 @@ def extract_info_with_gpt(raw_text, prompt):
     completion = client.chat.completions.create(
                   model='gpt-4o',
                   temperature=0,
-                  max_tokens=1500,
+                  response_format={ "type": "json_object" },
                   messages=[
                     {"role": "system", "content": "Extract the relevant information from the CV"},
                     {"role": "user", "content": prompt + "\n\n" + raw_text},
@@ -142,7 +142,7 @@ Description of responsibilities, achievements, or skills gained
 Skills
 Languages
 
-The output must be in the following format:
+The output must be in the following JSON format:
 {
     "name": "",
     "location": "",
