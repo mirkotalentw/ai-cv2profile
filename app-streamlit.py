@@ -41,7 +41,7 @@ class Language(BaseModel):
     def validate_degree(cls, v):
         valid_degrees = ["Beginner", "Good", "Fluent", "Proficient", "Native/Bilingual", ""]
         if v not in valid_degrees:
-            raise ValueError(f'Degree must be one of {valid_degrees}')
+            return ''
         return v
 
 class UserProfile(BaseModel):
