@@ -39,7 +39,7 @@ class Language(BaseModel):
 
     @field_validator('degree')
     def validate_degree(cls, v):
-        valid_degrees = ["Beginner", "Good", "Fluent", "Proficient", "Native/Bilingual"]
+        valid_degrees = ["Beginner", "Good", "Fluent", "Proficient", "Native/Bilingual", ""]
         if v not in valid_degrees:
             raise ValueError(f'Degree must be one of {valid_degrees}')
         return v
@@ -124,7 +124,8 @@ def extract_info_with_gpt(raw_text, prompt):
                     {"role": "user", "content": prompt + "\n\n" + raw_text},
                 ])
     
-    response = completion.choices[0].message.content  
+    response = completion.choices[0].message.content 
+    print(response) 
     return response.strip()
 
 prompt = """
