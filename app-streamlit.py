@@ -123,7 +123,7 @@ def extract_info_with_gpt(raw_text, prompt):
                   response_format={ "type": "json_object" },
                   messages=[
                     {"role": "system", "content": "Extract the relevant information from the CV"},
-                    {"role": "user", "content": prompt + "\n\n" + raw_text},
+                    {"role": "user", "content": prompt.replace("{DATETIME}", datetime.now().strftime("%Y-%m-%d")) + "\n\n" + raw_text},
                 ])
     
     response = completion.choices[0].message.content 
@@ -276,7 +276,6 @@ def display_main_app():
         if uploaded_file:
             with st.spinner('Converting... Please wait'):
                 raw_text = extract_raw_text_from_pdf(uploaded_file)
-                prompt = prompt.replace("{DATETIME}", datetime.now().strftime("%Y-%m-%d"))
                 extracted_info = extract_info_with_gpt(raw_text, prompt)
                 parsed_profile = parse_user_profile(extracted_info)
                 if parsed_profile:
