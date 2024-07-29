@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field, ValidationError, field_validator
 from typing import List, Optional
 import fitz
 import streamlit as st
+from datetime import datetime
 
 load_dotenv()
 
@@ -25,6 +26,7 @@ class WorkExperience(BaseModel):
     jobTitle: Optional[str] = Field(None, alias='jobTitle')
     company: Optional[str] = Field(None, alias='company')
     period: Optional[str] = Field(None, alias='period')
+    totalLength: Optional[str] = Field(None, alias='totalLength')
     description: Optional[str] = Field(None, alias='description')
 
 class Education(BaseModel):
@@ -155,6 +157,7 @@ The output must be in the following JSON format:
             "jobTitle": "",
             "company": "",
             "period": "",
+            "totalLength": "",
             "description": ""
         }
     ],
@@ -178,11 +181,11 @@ The output must be in the following JSON format:
 If something is not found, leave the field empty.
 Instructions:
 - name: First and Last name of the candidate
-- location: City and State of the candidate
+- location: City and State of the candidate, please provide it only from biography or data where it is clearly stated, DO NOT EXTRACT IT FROM POSITION OR EDUCATION
 - biography: A brief description of the candidate
 - totalWorkExperience: Total years and months of work experience
 - totalEducationDuration: Total years of education
-- workExperience: List of work experiences with job title, company, period, and description
+- workExperience: List of work experiences with job title, company, period, totalLength (total years and months of work experience for that position) and description
 - education: List of educational experiences with degree, educational institution, period, and description
 - skills: List of skills (please provide only the skill names, e.g. Python, TensorFlow, etc., without any additional information e.g. CSS – basic knowledge should only be CSS)
 - languages: List of languages with name and degree of proficiency (options: Beginner, Good, Fluent, Proficient, Native/Bilingual), example degree B2 is wrong, it should be Good.
@@ -199,12 +202,14 @@ Example:
             "jobTitle": "Data Scientist",
             "company": "CompanyA",
             "period": "Jan 2023 - ",
+            "totalLength": "1 year, 7 months",
             "description": "Working as data scientist on NLP projects."
         },
         {
             "jobTitle": "Data Analyst",
             "company": "CompanyB",
             "period": "May 2019 - Jan 2023",
+            "totalLength": "3 years, 9 months",
             "description": "Working as data analyst for financial reports."
         },
     ],
@@ -238,6 +243,8 @@ Example:
         },
     ]
 }
+
+For calculating dates, keep in mind that today it is: {DATETIME}
 """
 
 
@@ -269,6 +276,7 @@ def display_main_app():
         if uploaded_file:
             with st.spinner('Converting... Please wait'):
                 raw_text = extract_raw_text_from_pdf(uploaded_file)
+                prompt = prompt.replace("{DATETIME}", datetime.now().strftime("%Y-%m-%d"))
                 extracted_info = extract_info_with_gpt(raw_text, prompt)
                 parsed_profile = parse_user_profile(extracted_info)
                 if parsed_profile:
@@ -290,7 +298,7 @@ def display_main_app():
 
                     st.markdown("### Work Experience")
                     for work in parsed_profile.workExperience:
-                        with st.expander(f"{work.jobTitle} at {work.company} ({work.period})"):
+                        with st.expander(f"{work.jobTitle} at {work.company} ({work.period} : {work.totalLength})"):
                             st.markdown(work.description)
 
                     st.markdown("### Education")
