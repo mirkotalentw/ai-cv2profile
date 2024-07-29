@@ -81,6 +81,7 @@ def parse_user_profile(input_string: str) -> Optional[UserProfile]:
                     "jobTitle": we.get("jobTitle", ""),
                     "company": we.get("company", ""),
                     "period": we.get("period", ""),
+                    "totalLength": we.get("totalLength", ""),
                     "description": we.get("description", "")
                 } for we in data.get("workExperience", [])
             ],
