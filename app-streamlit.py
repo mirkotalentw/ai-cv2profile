@@ -20,6 +20,36 @@ client = OpenAI()
 
 if 'logged_in' not in st.session_state:
     st.session_state['logged_in'] = False
+    
+    
+
+def sum_periods(periods):
+    total_years = 0
+    total_months = 0
+
+    for period in periods:
+        years = months = 0
+
+        match_years = re.search(r'(\d+)\s*year', period)
+        match_months = re.search(r'(\d+)\s*month', period)
+
+        if match_years:
+            years = int(match_years.group(1))
+        if match_months:
+            months = int(match_months.group(1))
+
+        total_years += years
+        total_months += months
+
+    total_years += total_months // 12
+    total_months = total_months % 12
+
+    if total_years > 0 and total_months > 0:
+        return f"{total_years} years {total_months} months"
+    elif total_years > 0:
+        return f"{total_years} years"
+    else:
+        return f"{total_months} months"
 
 
 class WorkExperience(BaseModel):
@@ -33,6 +63,7 @@ class Education(BaseModel):
     degree: Optional[str] = Field(None, alias='degree')
     educationalInstitution: Optional[str] = Field(None, alias='educationalInstitution')
     period: Optional[str] = Field(None, alias='period')
+    totalLength: Optional[str] = Field(None, alias='totalLength')
     description: Optional[str] = Field(None, alias='description')
 
 class Language(BaseModel):
@@ -45,9 +76,31 @@ class Language(BaseModel):
         if v not in valid_degrees:
             return ''
         return v
+    
+class Publication(BaseModel):
+    date: Optional[str] = Field(None, alias='date')
+    description: Optional[str] = Field(None, alias='description')
+    name: Optional[str] = Field(None, alias='name')
+    periodEnd: Optional[str] = Field(None, alias='periodEnd')
+    periodStart: Optional[str] = Field(None, alias='periodStart')
+    publisher: Optional[str] = Field(None, alias='publisher')
+    tags: Optional[List[str]] = Field(None, alias='tags')
+    url: Optional[str] = Field(None, alias='url')
+    
+class Project(BaseModel):
+    date: Optional[str] = Field(None, alias='date')
+    description: Optional[str] = Field(None, alias='description')
+    name: Optional[str] = Field(None, alias='name')
+    periodEnd: Optional[str] = Field(None, alias='periodEnd')
+    periodStart: Optional[str] = Field(None, alias='periodStart')
+    skills: Optional[List[str]] = Field(None, alias='skills')
+    url: Optional[str] = Field(None, alias='url')
 
 class UserProfile(BaseModel):
     name: Optional[str] = Field(None, alias='name')
+    emails: Optional[List[str]] = Field(None, alias='emails')
+    phones: Optional[List[str]] = Field(None, alias='phones')
+    links: Optional[List[str]] = Field(None, alias='links')
     location: Optional[str] = Field(None, alias='location')
     biography: Optional[str] = Field(None, alias='biography')
     totalWorkExperience: Optional[str] = Field(None, alias='totalWorkExperience')
@@ -56,6 +109,8 @@ class UserProfile(BaseModel):
     education: List[Education] = Field(default_factory=list, alias='education')
     skills: List[str] = Field(default_factory=list, alias='skills')
     languages: List[Language] = Field(default_factory=list, alias='languages')
+    publications: List[Publication] = Field(default_factory=list, alias='publications')
+    projects: List[Project] = Field(default_factory=list, alias='projects')
 
 def extract_json_from_string(input_string: str) -> dict:
     try:
@@ -72,6 +127,9 @@ def parse_user_profile(input_string: str) -> Optional[UserProfile]:
     try:
         cleaned_data = {
             "name": data.get("name", ""),
+            "emails": data.get("emails", []),
+            "phones": data.get("phones", []),
+            "links": data.get("links", []),
             "location": data.get("location", ""),
             "biography": data.get("biography", ""),
             "totalWorkExperience": data.get("totalWorkExperience", ""),
@@ -90,6 +148,7 @@ def parse_user_profile(input_string: str) -> Optional[UserProfile]:
                     "degree": ed.get("degree", ""),
                     "educationalInstitution": ed.get("educationalInstitution", ""),
                     "period": ed.get("period", ""),
+                    "totalLength": ed.get("totalLength", ""),
                     "description": ed.get("description", "")
                 } for ed in data.get("education", [])
             ],
@@ -99,6 +158,29 @@ def parse_user_profile(input_string: str) -> Optional[UserProfile]:
                     "name": lang.get("name", ""),
                     "degree": lang.get("degree", "")
                 } for lang in data.get("languages", [])
+            ],
+            "publications": [
+                {
+                    "date": pub.get("date", ""),
+                    "description": pub.get("description", ""),
+                    "name": pub.get("name", ""),
+                    "periodEnd": pub.get("periodEnd", ""),
+                    "periodStart": pub.get("periodStart", ""),
+                    "publisher": pub.get("publisher", ""),
+                    "tags": pub.get("tags", []),
+                    "url": pub.get("url", "")
+                } for pub in data.get("publications", [])
+            ],
+            "projects": [
+                {
+                    "date": proj.get("date", ""),
+                    "description": proj.get("description", ""),
+                    "name": proj.get("name", ""),
+                    "periodEnd": proj.get("periodEnd", ""),
+                    "periodStart": proj.get("periodStart", ""),
+                    "skills": proj.get("skills", []),
+                    "url": proj.get("url", "")
+                } for proj in data.get("projects", [])
             ]
         }
 
@@ -142,13 +224,19 @@ For each position or educational experience:
 Job Title or Degree
 Company or Institution
 Dates (Start and End)
+Total Length (years and months)
 Description of responsibilities, achievements, or skills gained
 Skills
 Languages
+Publications
+Projects
 
 The output must be in the following JSON format:
 {
     "name": "",
+    "emails": [],
+    "phones": [],
+    "links": [],
     "location": "",
     "biography": "",
     "totalWorkExperience": "",
@@ -167,6 +255,7 @@ The output must be in the following JSON format:
             "degree": "",
             "educationalInstitution": "",
             "period": "",
+            "totalLength": "",
             "description": ""
         }
     ],
@@ -176,24 +265,55 @@ The output must be in the following JSON format:
             "name": "",
             "degree": ""  //options Beginner, Good, Fluent, Proficient, Native/Bilingual
         }
+    ],
+    "publications": [
+        {
+            "date": "",
+            "description": "",
+            "name": "",
+            "periodEnd": "",
+            "periodStart": "",
+            "publisher": "",
+            "tags": [],
+            "url": ""
+        }
+    ],
+    "projects": [
+        {
+            "date": "",
+            "description": "",
+            "name": "",
+            "periodEnd": "",
+            "periodStart": "",
+            "skills": [],
+            "url": ""
+        }
     ]
 }
 
 If something is not found, leave the field empty.
 Instructions:
 - name: First and Last name of the candidate
+- emails: List of email addresses of user
+- phones: List of phone numbers of user
+- links: List of links to user's profiles (e.g. LinkedIn, GitHub, Xing, Kaggle, etc.)
 - location: City and State of the candidate, please provide it only from biography or data where it is clearly stated, DO NOT EXTRACT IT FROM POSITION OR EDUCATION
 - biography: A brief description of the candidate
 - totalWorkExperience: Total years and months of work experience
 - totalEducationDuration: Total years of education
 - workExperience: List of work experiences with job title, company, period, totalLength (total years and months of work experience for that position) and description
-- education: List of educational experiences with degree, educational institution, period, and description
+- education: List of educational experiences with degree, educational institution, period, totalLength (total years and months of studies for that educational degree) and description
 - skills: List of skills (please provide only the skill names, e.g. Python, TensorFlow, etc., without any additional information e.g. CSS – basic knowledge should only be CSS)
 - languages: List of languages with name and degree of proficiency (options: Beginner, Good, Fluent, Proficient, Native/Bilingual), example degree B2 is wrong, it should be Good.
+- publications: List of publications (books, scientific papers, etc.) with date, description, name, periodEnd, periodStart, publisher, tags, and url
+- projects: List of projects (that don't belong to the working experience) with date, description, name, periodEnd, periodStart, skills, and url
 
 Example:
 {
     "name": "Marko Markovic",
+    "emails": ['marko.markovic@gmail.com'],
+    "phones": ['123-456-7890'],
+    "links": ['https://www.linkedin.com/in/marko-markovic'],
     "location": "San Francisco, CA",
     "biography": "Marko is a data scientist with more than 5 years of experience in machine learning and natural language processing. He has a Ph.D. in computer science from Stanford University. He is proficient in Python, TensorFlow, and PyTorch. Marko is a native English speaker.",
     "totalWorkExperience": "5 years 3 months",
@@ -219,12 +339,14 @@ Example:
             "degree": "Ph.D. in Computer Science",
             "educationalInstitution": "Stanford University",
             "period": "2013-2017",
+            "totalLength": "4 years",
             "description": ""
         },
         {
             "degree": "Msc. in Computer Science",
             "educationalInstitution": "Stanford University",
             "period": "2012-2013",
+            "totalLength": "1 year",
             "description": ""
         },
     ],
@@ -242,9 +364,33 @@ Example:
             "name": "Italian",
             "degree": "Beginner"
         },
+    ],
+    "publications": [
+        {
+            "date": "2022-01-01",
+            "description": "Published a paper on machine learning.",
+            "name": "Machine Learning Paper",
+            "periodEnd": "2022",
+            "periodStart": "2021",
+            "publisher": "IEEE",
+            "tags": ["Machine Learning", "NLP"],
+            "url": "https://www.example.com/paper"
+        }
+    ],
+    "projects": [
+        {
+            "date": "2022-01-01",
+            "description": "Built a chatbot for customer service.",
+            "name": "Customer Service Chatbot",
+            "periodEnd": "2022",
+            "periodStart": "2021",
+            "skills": ["Python", "TensorFlow", "NLP"],
+            "url": "https://www.example.com/chatbot"
+        }
     ]
 }
 
+Please, make sure to provide all the requested information and that each Work Experience, Education, publication, and project are EXTRACTED from uploaded resume.
 For calculating dates, keep in mind that today it is: {DATETIME}
 """
 
@@ -279,39 +425,69 @@ def display_main_app():
                 raw_text = extract_raw_text_from_pdf(uploaded_file)
                 extracted_info = extract_info_with_gpt(raw_text, prompt)
                 parsed_profile = parse_user_profile(extracted_info)
+    
                 if parsed_profile:
                     # st.write(parsed_profile.model_dump_json(indent=2))
+                    working_experience, education_experience = [], []
                     if parsed_profile.name:
                         st.header(parsed_profile.name)
 
                     if parsed_profile.location:
                         st.subheader(f"Location: {parsed_profile.location}")
+                        
+                    if parsed_profile.emails:
+                        st.markdown(f"**Emails:** {', '.join(parsed_profile.emails)}")
+                        
+                    if parsed_profile.phones:
+                        st.markdown(f"**Phones:** {', '.join(parsed_profile.phones)}")
+                        
+                    if parsed_profile.links:
+                        st.markdown(f"**Links:** {', '.join(parsed_profile.links)}")
 
                     if parsed_profile.biography:
                         st.markdown(f"**Biography:** {parsed_profile.biography}")
 
-                    if parsed_profile.totalWorkExperience:
-                        st.markdown(f"**Total Work Experience:** {parsed_profile.totalWorkExperience}")
-
-                    if parsed_profile.totalEducationDuration:
-                        st.markdown(f"**Total Education Duration:** {parsed_profile.totalEducationDuration}")
-
                     st.markdown("### Work Experience")
                     for work in parsed_profile.workExperience:
+                        working_experience.append(work.totalLength)
                         with st.expander(f"{work.jobTitle} at {work.company} ({work.period} : {work.totalLength})"):
                             st.markdown(work.description)
-
+                    
+                    if working_experience:
+                        st.markdown(f"**Total Work Experience:** {sum_periods(working_experience)}")
+                        
                     st.markdown("### Education")
                     for edu in parsed_profile.education:
-                        with st.expander(f"{edu.degree} at {edu.educationalInstitution} ({edu.period})"):
+                        education_experience.append(edu.totalLength)
+                        with st.expander(f"{edu.degree} at {edu.educationalInstitution} ({edu.period} : {edu.totalLength})"):
                             st.markdown(edu.description)
+                            
+                    if education_experience:
+                        st.markdown(f"**Total Education Duration:** {sum_periods(education_experience)}")
 
                     st.markdown("### Skills")
                     st.write(", ".join(parsed_profile.skills))
 
                     st.markdown("### Languages")
                     for lang in parsed_profile.languages:
-                        st.markdown(f"- **{lang.name}:** {lang.degree}")
+                        st.markdown(f"- **{lang.name}:** {lang.degree}")  
+                        
+                    st.markdown("### Publications")
+                    for pub in parsed_profile.publications:
+                        with st.expander(f"{pub.name} ({pub.periodStart} - {pub.periodEnd})"):
+                            st.markdown(f"**Date:** {pub.date}")
+                            st.markdown(f"**Publisher:** {pub.publisher}")
+                            st.markdown(f"**Description:** {pub.description}")
+                            st.markdown(f"**Tags:** {', '.join(pub.tags)}")
+                            st.markdown(f"**URL:** {pub.url}")
+                            
+                    st.markdown("### Projects")
+                    for proj in parsed_profile.projects:
+                        with st.expander(f"{proj.name} ({proj.periodStart} - {proj.periodEnd})"):
+                            st.markdown(f"**Date:** {proj.date}")
+                            st.markdown(f"**Description:** {proj.description}")
+                            st.markdown(f"**Skills:** {', '.join(proj.skills)}")
+                            st.markdown(f"**URL:** {proj.url}")
                 else:
                     st.write("Failed to parse the user profile.")
                 
