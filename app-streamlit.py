@@ -9,6 +9,7 @@ from typing import List, Optional
 import fitz
 import streamlit as st
 from datetime import datetime
+from dateutil.relativedelta import relativedelta
 
 load_dotenv()
 
@@ -23,33 +24,87 @@ if 'logged_in' not in st.session_state:
     
     
 
+
+def parse_date(date_str):
+    """Parses a date string to a datetime object. Handles various formats."""
+    if date_str.strip().upper() == "NOW" or date_str.strip() == "":
+        return datetime.now()
+
+    try:
+        return datetime.strptime(date_str, '%b %Y')  # e.g., 'Jan 2024'
+    except ValueError:
+        try:
+            return datetime.strptime(date_str, '%Y')  # e.g., '2024'
+        except ValueError:
+            return datetime.strptime(date_str, '%B %Y')  # e.g., 'July 2022'
+
+def parse_period_to_date_range(period):
+    """Parses a period string like 'Jan 2024 - NOW' into a date range."""
+    start_str, end_str = period.split('-')
+    start_date = parse_date(start_str.strip())
+    end_date = parse_date(end_str.strip())
+    return start_date, end_date
+
 def sum_periods(periods):
+    date_ranges = []
+
+    for period in periods:
+        start_date, end_date = parse_period_to_date_range(period)
+        date_ranges.append((start_date, end_date))
+
+    # Sort by start date
+    date_ranges.sort()
+
+    # Merge overlapping periods
+    merged_ranges = []
+    current_start, current_end = date_ranges[0]
+
+    for start, end in date_ranges[1:]:
+        if start <= current_end:  # Overlapping
+            current_end = max(current_end, end)
+        else:  # Non-overlapping, add the previous range and start a new one
+            merged_ranges.append((current_start, current_end))
+            current_start, current_end = start, end
+
+    merged_ranges.append((current_start, current_end))  # Add the last range
+
+    # Calculate the total duration
     total_years = 0
     total_months = 0
 
-    for period in periods:
-        years = months = 0
+    for start, end in merged_ranges:
+        delta = relativedelta(end, start)
+        total_years += delta.years
+        total_months += delta.months
 
-        match_years = re.search(r'(\d+)\s*year', period)
-        match_months = re.search(r'(\d+)\s*month', period)
-
-        if match_years:
-            years = int(match_years.group(1))
-        if match_months:
-            months = int(match_months.group(1))
-
-        total_years += years
-        total_months += months
-
+    # Adjust for any extra months into years
     total_years += total_months // 12
     total_months = total_months % 12
 
+    # Construct the result string
     if total_years > 0 and total_months > 0:
         return f"{total_years} years {total_months} months"
     elif total_years > 0:
         return f"{total_years} years"
     else:
         return f"{total_months} months"
+
+
+class TotalExperience(BaseModel):
+    totalWorkExperience: Optional[str] = Field(None, alias='totalWorkExperience')
+    totalEducationDuration: Optional[str] = Field(None, alias='totalEducationDuration')
+
+    @field_validator('totalWorkExperience')
+    def validate_totalWorkExperience(cls, v):
+        if not v:
+            return ''
+        return v
+
+    @field_validator('totalEducationDuration')
+    def validate_totalEducationDuration(cls, v):
+        if not v:
+            return ''
+        return v
 
 
 class WorkExperience(BaseModel):
@@ -197,6 +252,11 @@ def extract_raw_text_from_pdf(pdf_file):
     for page_num in range(document.page_count):
         page = document.load_page(page_num)
         raw_text += page.get_text("text")
+        links = page.get_links()
+        for link in links:
+            if link["kind"] == fitz.LINK_URI:  # Check if the link is a URL
+                url = link['uri']
+                raw_text += '\n' + url
     return raw_text
  
 def extract_info_with_gpt(raw_text, prompt):
@@ -210,7 +270,7 @@ def extract_info_with_gpt(raw_text, prompt):
                 ])
     
     response = completion.choices[0].message.content 
-    print(response) 
+    # print(response) 
     return response.strip()
 
 prompt = """
@@ -394,6 +454,51 @@ Please, make sure to provide all the requested information and that each Work Ex
 For calculating dates, keep in mind that today it is: {DATETIME}
 """
 
+system_prompt_duration_length = """
+Please calculate the total work experience duration and total education duration based on the user's provided periods. Follow these instructions carefully:
+
+1. **Work Experience Calculation**:
+   - Calculate the total years and months of work experience based on the provided periods.
+   - If there is a gap between two periods, do not count that time.
+   - If there is an overlap between two periods, count the overlapping time only once.
+   - If the end date is not provided, assume it is the current date.
+   - If the month is not provided, assume it is January for start dates and December for end dates.
+   - After calculating, store the total work experience duration.
+
+2. **Education Duration Calculation**:
+   - Separately, calculate the total years and months of education based on the provided periods.
+   - Apply the same rules as above: do not count gaps, and count overlapping time only once.
+   - If the end date is not provided, assume it is the current date.
+   - If the month is not provided, assume it is January for start dates and December for end dates.
+   - After calculating, store the total education duration.
+
+3. **Output**:
+   - The output must be in the following JSON format:
+     ```json
+     {
+         "totalWorkExperience": "X years Y months",
+         "totalEducationDuration": "X years Y months"
+     }
+     ```
+   - Ensure that the work experience and education durations are calculated and stored separately before outputting the final JSON.
+
+The current date is {DATETIME}.
+The user's work experience is {WORK_EXPERIENCE}.
+The user's education experience is {EDUCATION}.
+
+Example:
+The current date is 2024-08-26.
+The user's work experience is ['Jan 2024 - NOW', 'July 2022 - Jan 2024', 'Jan 2021 - July 2022', 'Jan 2020 - Jan 2021', 'Jan 2019 - July 2021']
+The user's education experience is ['2019 - ', '2017 - 2018', '2014 - 2017']
+
+The output MUST be:
+{
+    "totalWorkExperience": "5 years 8 months",
+    "totalEducationDuration": "9 years 8 months"
+}
+"""
+
+
 
 def check_credentials(username, password):
     correct_password = os.getenv('USER_PASSWORD')
@@ -449,21 +554,25 @@ def display_main_app():
 
                     st.markdown("### Work Experience")
                     for work in parsed_profile.workExperience:
-                        working_experience.append(work.totalLength)
+                        working_experience.append(work.period)
                         with st.expander(f"{work.jobTitle} at {work.company} ({work.period} : {work.totalLength})"):
                             st.markdown(work.description)
-                    
-                    if working_experience:
-                        st.markdown(f"**Total Work Experience:** {sum_periods(working_experience)}")
+                
                         
                     st.markdown("### Education")
                     for edu in parsed_profile.education:
-                        education_experience.append(edu.totalLength)
+                        education_experience.append(edu.period)
                         with st.expander(f"{edu.degree} at {edu.educationalInstitution} ({edu.period} : {edu.totalLength})"):
                             st.markdown(edu.description)
                             
+                        
+                    total_experience = extract_total_length_with_gpt(str(working_experience), str(education_experience), system_prompt_duration_length)
+                    
+                    if working_experience:
+                        st.markdown(f"**Total Work Experience:** {total_experience.totalWorkExperience}")
+                    
                     if education_experience:
-                        st.markdown(f"**Total Education Duration:** {sum_periods(education_experience)}")
+                        st.markdown(f"**Total Education Duration:** {total_experience.totalEducationDuration}")
 
                     st.markdown("### Skills")
                     st.write(", ".join(parsed_profile.skills))
@@ -490,6 +599,33 @@ def display_main_app():
                             st.markdown(f"**URL:** {proj.url}")
                 else:
                     st.write("Failed to parse the user profile.")
+                    
+                    
+def extract_total_length_with_gpt(working_experience, education, prompt):
+    prompt = prompt.replace("{DATETIME}", datetime.now().strftime("%Y-%m-%d")).replace("{WORK_EXPERIENCE}", working_experience).replace("{EDUCATION}", education)
+    completion = client.chat.completions.create(
+                  model='gpt-4o',
+                  temperature=0,
+                  response_format={ "type": "json_object" },
+                  messages=[
+                    {"role": "system", "content": "Extract the relevant information from the provided periods"},
+                    {"role": "user", "content": prompt},
+                ])
+    
+    response = completion.choices[0].message.content 
+    # print(response)
+    data = extract_json_from_string(response)
+    if not data:
+        return None
+    try:
+        cleaned_data = {
+            "totalWorkExperience": data.get("totalWorkExperience", ""),
+            "totalEducationDuration": data.get("totalEducationDuration", "")
+        }
+        total_length = TotalExperience(**cleaned_data)
+        return total_length
+    except ValidationError as e:
+        return None
                 
  
 if not st.session_state['logged_in']:
