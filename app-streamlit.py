@@ -24,72 +24,6 @@ if 'logged_in' not in st.session_state:
     
     
 
-
-def parse_date(date_str):
-    """Parses a date string to a datetime object. Handles various formats."""
-    if date_str.strip().upper() == "NOW" or date_str.strip() == "":
-        return datetime.now()
-
-    try:
-        return datetime.strptime(date_str, '%b %Y')  # e.g., 'Jan 2024'
-    except ValueError:
-        try:
-            return datetime.strptime(date_str, '%Y')  # e.g., '2024'
-        except ValueError:
-            return datetime.strptime(date_str, '%B %Y')  # e.g., 'July 2022'
-
-def parse_period_to_date_range(period):
-    """Parses a period string like 'Jan 2024 - NOW' into a date range."""
-    start_str, end_str = period.split('-')
-    start_date = parse_date(start_str.strip())
-    end_date = parse_date(end_str.strip())
-    return start_date, end_date
-
-def sum_periods(periods):
-    date_ranges = []
-
-    for period in periods:
-        start_date, end_date = parse_period_to_date_range(period)
-        date_ranges.append((start_date, end_date))
-
-    # Sort by start date
-    date_ranges.sort()
-
-    # Merge overlapping periods
-    merged_ranges = []
-    current_start, current_end = date_ranges[0]
-
-    for start, end in date_ranges[1:]:
-        if start <= current_end:  # Overlapping
-            current_end = max(current_end, end)
-        else:  # Non-overlapping, add the previous range and start a new one
-            merged_ranges.append((current_start, current_end))
-            current_start, current_end = start, end
-
-    merged_ranges.append((current_start, current_end))  # Add the last range
-
-    # Calculate the total duration
-    total_years = 0
-    total_months = 0
-
-    for start, end in merged_ranges:
-        delta = relativedelta(end, start)
-        total_years += delta.years
-        total_months += delta.months
-
-    # Adjust for any extra months into years
-    total_years += total_months // 12
-    total_months = total_months % 12
-
-    # Construct the result string
-    if total_years > 0 and total_months > 0:
-        return f"{total_years} years {total_months} months"
-    elif total_years > 0:
-        return f"{total_years} years"
-    else:
-        return f"{total_months} months"
-
-
 class TotalExperience(BaseModel):
     totalWorkExperience: Optional[str] = Field(None, alias='totalWorkExperience')
     totalEducationDuration: Optional[str] = Field(None, alias='totalEducationDuration')
@@ -260,13 +194,15 @@ def extract_raw_text_from_pdf(pdf_file):
     return raw_text
  
 def extract_info_with_gpt(raw_text, prompt):
+    cv_prompt = prompt.replace("{DATETIME}", datetime.now().strftime("%Y-%m-%d")) + "\n\n" + raw_text
+    # print(cv_prompt)
     completion = client.chat.completions.create(
                   model='gpt-4o',
                   temperature=0,
                   response_format={ "type": "json_object" },
                   messages=[
                     {"role": "system", "content": "Extract the relevant information from the CV"},
-                    {"role": "user", "content": prompt.replace("{DATETIME}", datetime.now().strftime("%Y-%m-%d")) + "\n\n" + raw_text},
+                    {"role": "user", "content": cv_prompt },
                 ])
     
     response = completion.choices[0].message.content 
@@ -284,7 +220,7 @@ For each position or educational experience:
 Job Title or Degree
 Company or Institution
 Dates (Start and End)
-Total Length (years and months)
+Total Length (years and months) # This is the total years and months of work experience for that position or educational degree. Please evaluate the total length based on the provided periods.
 Description of responsibilities, achievements, or skills gained
 Skills
 Languages
@@ -306,7 +242,7 @@ The output must be in the following JSON format:
             "jobTitle": "",
             "company": "",
             "period": "",
-            "totalLength": "",
+            "totalLength": "",   //total years and months of work experience for that position. Please, calculate it correctly. If the end date is not provided, assume it is the current date {DATETIME}. If the month is not provided, assume it is January for start dates and December for end dates.
             "description": ""
         }
     ],
@@ -315,7 +251,7 @@ The output must be in the following JSON format:
             "degree": "",
             "educationalInstitution": "",
             "period": "",
-            "totalLength": "",
+            "totalLength": "",    //total years and months of studies for that educational degree. Please, calculate it correctly. If the end date is not provided, assume it is the current date {DATETIME}. If the month is not provided, assume it is January for start dates and December for end dates.
             "description": ""
         }
     ],
@@ -452,6 +388,7 @@ Example:
 
 Please, make sure to provide all the requested information and that each Work Experience, Education, publication, and project are EXTRACTED from uploaded resume.
 For calculating dates, keep in mind that today it is: {DATETIME}
+Please, provide correct length of work experience and education duration for each position based on the provided periods and provided current date.
 """
 
 system_prompt_duration_length = """
