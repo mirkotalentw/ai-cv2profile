@@ -10,6 +10,7 @@ import fitz
 import streamlit as st
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
+from urllib.parse import urlparse, urlunparse
 
 load_dotenv()
 
@@ -21,6 +22,17 @@ client = OpenAI()
 
 if 'logged_in' not in st.session_state:
     st.session_state['logged_in'] = False
+    
+    
+
+def fix_url(url):
+    parsed_url = urlparse(url)
+    
+    if not parsed_url.scheme:
+        url = 'https://' + url
+        parsed_url = urlparse(url)
+    
+    return urlunparse(parsed_url)
     
     
 
@@ -118,7 +130,7 @@ def parse_user_profile(input_string: str) -> Optional[UserProfile]:
             "name": data.get("name", ""),
             "emails": data.get("emails", []),
             "phones": data.get("phones", []),
-            "links": data.get("links", []),
+            "links": [fix_url(link) for link in data.get("links", [])],
             "location": data.get("location", ""),
             "biography": data.get("biography", ""),
             "totalWorkExperience": data.get("totalWorkExperience", ""),
@@ -242,7 +254,7 @@ The output must be in the following JSON format:
             "jobTitle": "",
             "company": "",
             "period": "",
-            "totalLength": "",   //total years and months of work experience for that position. Please, calculate it correctly. If the end date is not provided, assume it is the current date {DATETIME}. If the month is not provided, assume it is January for start dates and December for end dates.
+            "totalLength": "",   //total years and months of work experience for that position. Please, calculate it correctly. If the end date is not provided, assume it is the current date {DATETIME}. If the month is not provided, assume it is January for start dates and December for end dates. If it is from Jan 22 to Jan 23, then it is 13 months. Include the last month if it is not full.
             "description": ""
         }
     ],
@@ -251,7 +263,7 @@ The output must be in the following JSON format:
             "degree": "",
             "educationalInstitution": "",
             "period": "",
-            "totalLength": "",    //total years and months of studies for that educational degree. Please, calculate it correctly. If the end date is not provided, assume it is the current date {DATETIME}. If the month is not provided, assume it is January for start dates and December for end dates.
+            "totalLength": "",    //total years and months of studies for that educational degree. Please, calculate it correctly. If the end date is not provided, assume it is the current date {DATETIME}. If the month is not provided, assume it is January for start dates and December for end dates. If it is from Jan 22 to Jan 23, then it is 13 months. Include the last month if it is not full.
             "description": ""
         }
     ],
@@ -389,6 +401,17 @@ Example:
 Please, make sure to provide all the requested information and that each Work Experience, Education, publication, and project are EXTRACTED from uploaded resume.
 For calculating dates, keep in mind that today it is: {DATETIME}
 Please, provide correct length of work experience and education duration for each position based on the provided periods and provided current date.
+
+Please, make sure that you know difference between EDUCATION and WORK EXPERIENCE. It is very important to split them correctly!
+
+
+IMPORTANT:
+WHEN CALCULATING TOTALLENGTH FOR SPECIFIC POSITION OR EDUCATION, PLEASE, INCLUDE THE LAST MONTH IF IT IS NOT FULL. 
+EXAMPLE: FEB 2022 - FEB 2023 IS 13 MONTHS, NOT 12 (1 YEAR), SO SOLUTION IS 1 YEAR 1 MONTH, NOT 1 YEAR!
+EXAMPLE 2: 2018 - 2019 IS 2 YEARS, NOT 1 YEAR!
+EXAMPLE 3: JAN 2022 - FEB 2023 IS 14 MONTHS (1 YEAR 2 MONTHS), NOT 1 YEAR 1 MONTH!
+
+Check the examples above and make sure to calculate it correctly! Do not make mistakes!
 """
 
 system_prompt_duration_length = """
