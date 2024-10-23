@@ -561,7 +561,14 @@ def display_main_app():
                     for work in parsed_profile.workExperience:
                         working_experience.append(work.period)
                         years, months = calculate_years_months(work.periodStart, work.periodEnd)
-                        with st.expander(f"{work.jobTitle} at {work.company} ({work.period} : {years} years {months} months)"):
+                        duration_str = ""
+                        if years > 0:
+                            duration_str += f"{years} year{'s' if years != 1 else ''}"
+                        if months > 0:
+                            if duration_str:
+                                duration_str += " "
+                            duration_str += f"{months} month{'s' if months != 1 else ''}"
+                        with st.expander(f"{work.jobTitle} at {work.company} ({work.period} : {duration_str})"):
                             st.markdown(work.description)
                 
                         
@@ -569,7 +576,14 @@ def display_main_app():
                     for edu in parsed_profile.education:
                         education_experience.append(edu.period)
                         years, months = calculate_years_months(edu.periodStart, edu.periodEnd)
-                        with st.expander(f"{edu.degree} at {edu.educationalInstitution} ({edu.period} : {years} years {months} months)"):
+                        duration_str = ""
+                        if years > 0:
+                            duration_str += f"{years} year{'s' if years != 1 else ''}"
+                        if months > 0:
+                            if duration_str:
+                                duration_str += " "
+                            duration_str += f"{months} month{'s' if months != 1 else ''}"
+                        with st.expander(f"{edu.degree} at {edu.educationalInstitution} ({edu.period} : {duration_str})"):
                             st.markdown(edu.description)
                             
                         
