@@ -57,6 +57,8 @@ class WorkExperience(BaseModel):
     jobTitle: Optional[str] = Field(None, alias='jobTitle')
     company: Optional[str] = Field(None, alias='company')
     period: Optional[str] = Field(None, alias='period')
+    periodStart: Optional[str] = Field(None, alias='periodStart')
+    periodEnd: Optional[str] = Field(None, alias='periodEnd')
     totalLength: Optional[str] = Field(None, alias='totalLength')
     description: Optional[str] = Field(None, alias='description')
 
@@ -64,6 +66,8 @@ class Education(BaseModel):
     degree: Optional[str] = Field(None, alias='degree')
     educationalInstitution: Optional[str] = Field(None, alias='educationalInstitution')
     period: Optional[str] = Field(None, alias='period')
+    periodStart: Optional[str] = Field(None, alias='periodStart')
+    periodEnd: Optional[str] = Field(None, alias='periodEnd')
     totalLength: Optional[str] = Field(None, alias='totalLength')
     description: Optional[str] = Field(None, alias='description')
 
@@ -140,6 +144,8 @@ def parse_user_profile(input_string: str) -> Optional[UserProfile]:
                     "jobTitle": we.get("jobTitle", ""),
                     "company": we.get("company", ""),
                     "period": we.get("period", ""),
+                    "periodStart": we.get("periodStart", ""),
+                    "periodEnd": we.get("periodEnd", ""),
                     "totalLength": we.get("totalLength", ""),
                     "description": we.get("description", "")
                 } for we in data.get("workExperience", [])
@@ -149,6 +155,8 @@ def parse_user_profile(input_string: str) -> Optional[UserProfile]:
                     "degree": ed.get("degree", ""),
                     "educationalInstitution": ed.get("educationalInstitution", ""),
                     "period": ed.get("period", ""),
+                    "periodStart": ed.get("periodStart", ""),
+                    "periodEnd": ed.get("periodEnd", ""),
                     "totalLength": ed.get("totalLength", ""),
                     "description": ed.get("description", "")
                 } for ed in data.get("education", [])
@@ -254,6 +262,8 @@ The output must be in the following JSON format:
             "jobTitle": "",
             "company": "",
             "period": "",
+            "periodStart": "",
+            "periodEnd": "",
             "totalLength": "",   //total years and months of work experience for that position. Please, calculate it correctly. If the end date is not provided, assume it is the current date {DATETIME}. If the month is not provided, assume it is January for start dates and December for end dates. If it is from Jan 22 to Jan 23, then it is 13 months. Include the last month if it is not full.
             "description": ""
         }
@@ -263,6 +273,8 @@ The output must be in the following JSON format:
             "degree": "",
             "educationalInstitution": "",
             "period": "",
+            "periodStart": "",
+            "periodEnd": "",
             "totalLength": "",    //total years and months of studies for that educational degree. Please, calculate it correctly. If the end date is not provided, assume it is the current date {DATETIME}. If the month is not provided, assume it is January for start dates and December for end dates. If it is from Jan 22 to Jan 23, then it is 13 months. Include the last month if it is not full.
             "description": ""
         }
@@ -304,7 +316,7 @@ Instructions:
 - name: First and Last name of the candidate
 - emails: List of email addresses of user
 - phones: List of phone numbers of user
-- links: List of links to user's profiles (e.g. LinkedIn, GitHub, Xing, Kaggle, etc.)
+- links: List of links to user's profiles (e.g. LinkedIn, GitHub, Xing, Kaggle, etc.). If there are multiple links, from other sections, like Projects, Publications, please DO NOT include them here!
 - location: City and State of the candidate, please provide it only from biography or data where it is clearly stated, DO NOT EXTRACT IT FROM POSITION OR EDUCATION
 - biography: A brief description of the candidate
 - totalWorkExperience: Total years and months of work experience
@@ -331,6 +343,8 @@ Example:
             "jobTitle": "Data Scientist",
             "company": "CompanyA",
             "period": "Jan 2023 - ",
+            "periodStart": "01-01-2023",
+            "periodEnd": "",
             "totalLength": "1 year, 7 months",
             "description": "Working as data scientist on NLP projects."
         },
@@ -338,6 +352,8 @@ Example:
             "jobTitle": "Data Analyst",
             "company": "CompanyB",
             "period": "May 2019 - Jan 2023",
+            "periodStart": "01-05-2019",
+            "periodEnd": "31-01-2023",
             "totalLength": "3 years, 9 months",
             "description": "Working as data analyst for financial reports."
         },
@@ -347,6 +363,8 @@ Example:
             "degree": "Ph.D. in Computer Science",
             "educationalInstitution": "Stanford University",
             "period": "2013-2017",
+            "periodStart": "01-01-2013",
+            "periodEnd": "31-12-2017",
             "totalLength": "4 years",
             "description": ""
         },
@@ -354,7 +372,9 @@ Example:
             "degree": "Msc. in Computer Science",
             "educationalInstitution": "Stanford University",
             "period": "2012-2013",
-            "totalLength": "1 year",
+            "periodStart": "01-01-2012",
+            "periodEnd": "31-12-2013",
+            "totalLength": "2 years",
             "description": ""
         },
     ],
@@ -459,6 +479,31 @@ The output MUST be:
 """
 
 
+def calculate_years_months(date1, date2):
+
+    d1 = datetime.strptime(date1, "%d-%m-%Y")
+    
+    if date2 == "":
+        d2 = datetime.now()
+    else:
+        d2 = datetime.strptime(date2, "%d-%m-%Y")
+    
+    years = d2.year - d1.year
+    months = d2.month - d1.month
+    
+    if d2.day >= d1.day:
+        months += 1
+    
+    if months >= 12:
+        years += 1
+        months -= 12
+        
+    if months < 0:
+        years -= 1
+        months += 12
+    
+    return years, months
+
 
 def check_credentials(username, password):
     correct_password = os.getenv('USER_PASSWORD')
@@ -515,14 +560,16 @@ def display_main_app():
                     st.markdown("### Work Experience")
                     for work in parsed_profile.workExperience:
                         working_experience.append(work.period)
-                        with st.expander(f"{work.jobTitle} at {work.company} ({work.period} : {work.totalLength})"):
+                        years, months = calculate_years_months(work.periodStart, work.periodEnd)
+                        with st.expander(f"{work.jobTitle} at {work.company} ({work.period} : {years} years {months} months)"):
                             st.markdown(work.description)
                 
                         
                     st.markdown("### Education")
                     for edu in parsed_profile.education:
                         education_experience.append(edu.period)
-                        with st.expander(f"{edu.degree} at {edu.educationalInstitution} ({edu.period} : {edu.totalLength})"):
+                        years, months = calculate_years_months(edu.periodStart, edu.periodEnd)
+                        with st.expander(f"{edu.degree} at {edu.educationalInstitution} ({edu.period} : {years} years {months} months)"):
                             st.markdown(edu.description)
                             
                         
