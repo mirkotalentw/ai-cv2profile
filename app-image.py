@@ -6,11 +6,55 @@ from dotenv import load_dotenv
 import json
 from pydantic import BaseModel, Field, ValidationError, field_validator
 from typing import List, Optional
-import fitz
+import fitz  # PyMuPDF
 import streamlit as st
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 from urllib.parse import urlparse, urlunparse
+import base64
+from pdf2image import convert_from_bytes
+import io
+import tempfile
+import os
+from PIL import Image
+
+# Function to encode the image
+def encode_image(image_path):
+  with open(image_path, "rb") as image_file:
+    return base64.b64encode(image_file.read()).decode('utf-8')
+
+
+def convert_pdf_to_images(uploaded_file):
+    try:
+        # Create a temporary file to store the PDF content
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp_file:
+            tmp_file.write(uploaded_file.getvalue())
+            tmp_path = tmp_file.name
+
+        # Open the PDF from the temporary file
+        pdf_document = fitz.open(tmp_path)
+        
+        image_paths = []
+        for page_num in range(len(pdf_document)):
+            page = pdf_document.load_page(page_num)
+            pix = page.get_pixmap()
+            
+            # Convert PyMuPDF pixmap to PIL Image
+            img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+            
+            # Save the image
+            image_path = f"./resumes_images/page_{page_num + 1}.png"
+            img.save(image_path, "PNG")
+            image_paths.append(image_path)
+        
+        pdf_document.close()
+        # Clean up the temporary file
+        os.unlink(tmp_path)
+        return image_paths
+        
+    except Exception as e:
+        st.error(f"Error processing PDF: {str(e)}")
+        return []
 
 load_dotenv()
 
@@ -213,20 +257,44 @@ def extract_raw_text_from_pdf(pdf_file):
                 raw_text += '\n' + url
     return raw_text
  
-def extract_info_with_gpt(raw_text, prompt):
+def extract_info_with_gpt(raw_text, prompt, img_path):
     cv_prompt = prompt.replace("{DATETIME}", datetime.now().strftime("%Y-%m-%d")) + "\n\n" + raw_text
+    img = encode_image(img_path[0])
     # print(cv_prompt)
-    completion = client.chat.completions.create(
-                  model='gpt-4o',
-                  temperature=0,
-                  response_format={ "type": "json_object" },
-                  messages=[
-                    {"role": "system", "content": "Extract the relevant information from the CV"},
-                    {"role": "user", "content": cv_prompt },
-                ])
+    # completion = client.chat.completions.create(
+    #               model='gpt-4o',
+    #               temperature=0,
+    #               response_format={ "type": "json_object" },
+    #               messages=[
+    #                 {"role": "system", "content": "Extract the relevant information from the CV"},
+    #                 {"role": "user", "content": cv_prompt },
+    #             ])
     
-    response = completion.choices[0].message.content 
+    # response = completion.choices[0].message.content 
     # print(response) 
+    completion = client.chat.completions.create(
+        model="gpt-4o-2024-08-06",
+        messages=[
+            {
+            "role": "user",
+            "content": [
+                {
+                "type": "text",
+                "text": f"{cv_prompt}",
+                },
+                {
+                "type": "image_url",
+                "image_url": {
+                    "url":  f"data:image/jpeg;base64,{img}"
+                },
+                },
+            ],
+            }
+        ],
+    )
+
+    print(completion)
+    response = completion.choices[0].message.content 
     return response.strip()
 
 prompt = """
@@ -431,8 +499,6 @@ EXAMPLE: FEB 2022 - FEB 2023 IS 13 MONTHS, NOT 12 (1 YEAR), SO SOLUTION IS 1 YEA
 EXAMPLE 2: 2018 - 2019 IS 2 YEARS, NOT 1 YEAR!
 EXAMPLE 3: JAN 2022 - FEB 2023 IS 14 MONTHS (1 YEAR 2 MONTHS), NOT 1 YEAR 1 MONTH!
 
-If something is in the future, calculate it only until today's date {DATETIME}.
-
 Check the examples above and make sure to calculate it correctly! Do not make mistakes!
 """
 
@@ -446,7 +512,6 @@ Please calculate the total work experience duration and total education duration
    - If the end date is not provided, assume it is the current date.
    - If the month is not provided, assume it is January for start dates and December for end dates.
    - After calculating, store the total work experience duration.
-   - If something is in the future, calculate it only until today's date {DATETIME}.
 
 2. **Education Duration Calculation**:
    - Separately, calculate the total years and months of education based on the provided periods.
@@ -454,7 +519,6 @@ Please calculate the total work experience duration and total education duration
    - If the end date is not provided, assume it is the current date.
    - If the month is not provided, assume it is January for start dates and December for end dates.
    - After calculating, store the total education duration.
-   - If something is in the future, calculate it only until today's date {DATETIME}.
 
 3. **Output**:
    - The output must be in the following JSON format:
@@ -527,57 +591,6 @@ def display_login_form():
                 st.experimental_rerun()
             else:
                 st.error("Incorrect username or password.")
-                
-
-def calculate_duration(date_ranges):
-    """
-    Calculate total duration from a list of date ranges, considering overlaps and gaps.
-    
-    Args:
-        date_ranges: List of tuples containing date strings in format (start_date, end_date)
-                    where dates are in "DD-MM-YYYY" format
-    
-    Returns:
-        tuple: (years, months) representing the total duration
-    """
-    # Convert date strings to datetime objects and sort by start date
-    ranges = [(datetime.strptime(start, "%d-%m-%Y"), 
-            datetime.now() if not end else datetime.strptime(end, "%d-%m-%Y")) 
-            for start, end in date_ranges]
-    ranges.sort()
-
-    # Merge overlapping ranges
-    merged_ranges = []
-    if ranges:
-        current_start, current_end = ranges[0]
-        
-        for start, end in ranges[1:]:
-            if start <= current_end:  # Overlapping or contiguous range
-                current_end = max(current_end, end)
-            else:  # Non-overlapping range
-                merged_ranges.append((current_start, current_end))
-                current_start, current_end = start, end
-        
-        merged_ranges.append((current_start, current_end))
-
-    # Calculate total duration
-    total_months = 0
-    for start, end in merged_ranges:
-        # Calculate the difference including partial months
-        diff = relativedelta(end, start)
-        months = diff.years * 12 + diff.months
-        
-        # If there are any days, round up to next month
-        if diff.days > 0:
-            months += 1
-            
-        total_months += months
-
-    # Convert total months to years and months
-    years = total_months // 12
-    remaining_months = total_months % 12
-
-    return years, remaining_months
 
 
 def display_main_app():
@@ -587,8 +600,9 @@ def display_main_app():
     if st.button('Convert CV'):
         if uploaded_file:
             with st.spinner('Converting... Please wait'):
+                img_path = convert_pdf_to_images(uploaded_file)
                 raw_text = extract_raw_text_from_pdf(uploaded_file)
-                extracted_info = extract_info_with_gpt(raw_text, prompt)
+                extracted_info = extract_info_with_gpt(raw_text, prompt, img_path)
                 parsed_profile = parse_user_profile(extracted_info)
     
                 if parsed_profile:
@@ -613,11 +627,9 @@ def display_main_app():
                         st.markdown(f"**Biography:** {parsed_profile.biography}")
 
                     st.markdown("### Work Experience")
-                    total_work_experience = []
                     for work in parsed_profile.workExperience:
                         working_experience.append(work.period)
                         years, months = calculate_years_months(work.periodStart, work.periodEnd)
-                        total_work_experience.append((work.periodStart, work.periodEnd))
                         duration_str = ""
                         if years > 0:
                             duration_str += f"{years} year{'s' if years != 1 else ''}"
@@ -630,11 +642,9 @@ def display_main_app():
                 
                         
                     st.markdown("### Education")
-                    total_education_experience = []
                     for edu in parsed_profile.education:
                         education_experience.append(edu.period)
                         years, months = calculate_years_months(edu.periodStart, edu.periodEnd)
-                        total_education_experience.append((edu.periodStart, edu.periodEnd))
                         duration_str = ""
                         if years > 0:
                             duration_str += f"{years} year{'s' if years != 1 else ''}"
@@ -646,22 +656,13 @@ def display_main_app():
                             st.markdown(edu.description)
                             
                         
-                    # total_experience = extract_total_length_with_gpt(str(working_experience), str(education_experience), system_prompt_duration_length)
-                    
-                    # if working_experience:
-                    #     st.markdown(f"**Total Work Experience:** {total_experience.totalWorkExperience}")
-                    
-                    # if education_experience:
-                    #     st.markdown(f"**Total Education Duration:** {total_experience.totalEducationDuration}")
-                                        
-                    total_work_exp_y, total_work_exp_m  = calculate_duration(total_work_experience)
-                    total_edu_exp_y, total_edu_exp_m = calculate_duration(total_education_experience)
+                    total_experience = extract_total_length_with_gpt(str(working_experience), str(education_experience), system_prompt_duration_length)
                     
                     if working_experience:
-                        st.markdown(f"**Total Work Experience:** {total_work_exp_y} years, {total_work_exp_m} months")
+                        st.markdown(f"**Total Work Experience:** {total_experience.totalWorkExperience}")
                     
                     if education_experience:
-                        st.markdown(f"**Total Education Duration:** {total_edu_exp_y} years, {total_edu_exp_m} months")
+                        st.markdown(f"**Total Education Duration:** {total_experience.totalEducationDuration}")
 
                     st.markdown("### Skills")
                     st.write(", ".join(parsed_profile.skills))
@@ -721,3 +722,5 @@ if not st.session_state['logged_in']:
     display_login_form()
 else:
     display_main_app()
+
+
