@@ -570,6 +570,7 @@ Example:
 Please, make sure to provide all the requested information and that each Work Experience, Education, publication, and project are EXTRACTED from uploaded resume.
 For calculating dates, keep in mind that today it is: {DATETIME}
 Please, provide correct length of work experience and education duration for each position based on the provided periods and provided current date.
+Also, if only one date is provided, check on image if it is start or end date, if you cannot decide or you are not sure, ignore it.
 
 Please, make sure that you know difference between EDUCATION and WORK EXPERIENCE. It is very important to split them correctly!
 
@@ -588,6 +589,9 @@ Use raw text for data, as it must be the same as it is in the CV (not summaries 
 Images use only to check the order and to classify things properly. For example, if Junior frontend developer is in Education section, place it in education, do not change stuff like that! THIS IS A MUST AND MUST BE FOLLOWED. YOU CANNOT CHANGE THE ORDER OF POINTS, THEY MUST BE IN THE SAME SECTION AS IN THE CV. IF YOU CANNOT DECIDE WHICH SECTION IS THAT, YOU MUST CHECK ON THE PROVIDED IMAGE. 
 
 If description of education or work experience is too large, it doesn't matter. You must put the whole description of position. It must be exactly the same as in the uploaded resume. NO SUMMARIES, NO SHORTER VERSIONS, THE ONLY ACCEPTABLE IS TO BE THE SAME AS IN THE CV.
+
+IMPORTANT NOTE:
+If in education only one date is provided, check the other education points and if each of them has only one date, IGNORE DATES, DO NOT RETURN THOSE DATES IN THE RESPONSE, but ONLY IN THAT CASE.
 """
 
 
@@ -687,6 +691,8 @@ def display_main_app():
                             if duration_str:
                                 duration_str += " "
                             duration_str += f"{months} month{'s' if months != 1 else ''}"
+                        if (duration_str==""):
+                            duration_str=work.totalLength
                         with st.expander(f"{work.jobTitle} at {work.company} ({work.period} : {duration_str})"):
                             st.markdown(work.description)
                 
@@ -704,6 +710,8 @@ def display_main_app():
                             if duration_str:
                                 duration_str += " "
                             duration_str += f"{months} month{'s' if months != 1 else ''}"
+                        if (duration_str==""):
+                            duration_str=edu.totalLength
                         with st.expander(f"{edu.degree} at {edu.educationalInstitution} ({edu.period} : {duration_str})"):
                             st.markdown(edu.description)
                             
@@ -712,10 +720,16 @@ def display_main_app():
                     total_edu_exp_y, total_edu_exp_m = calculate_duration(total_education_experience)
                     
                     if working_experience:
-                        st.markdown(f"**Total Work Experience:** {total_work_exp_y} years, {total_work_exp_m} months")
+                        if ((total_work_exp_y==0) and (total_work_exp_m==0)):
+                            st.markdown(f"**Total Work Experience:** {parsed_profile.totalWorkExperience}")
+                        else:
+                            st.markdown(f"**Total Work Experience:** {total_work_exp_y} years, {total_work_exp_m} months")
                     
                     if education_experience:
-                        st.markdown(f"**Total Education Duration:** {total_edu_exp_y} years, {total_edu_exp_m} months")
+                        if ((total_edu_exp_m==0) and (total_edu_exp_y==0)):
+                            st.markdown(f"**Total Education Duration:** {parsed_profile.totalEducationDuration}")
+                        else:
+                            st.markdown(f"**Total Education Duration:** {total_edu_exp_y} years, {total_edu_exp_m} months")
 
                     st.markdown("### Skills")
                     st.write(", ".join(parsed_profile.skills))
