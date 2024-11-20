@@ -332,39 +332,48 @@ def extract_raw_text_from_pdf(pdf_file):
  
 def extract_info_with_gpt(raw_text, prompt, images):
     cv_prompt = prompt.replace("{DATETIME}", datetime.now().strftime("%Y-%m-%d")) + "\n\n" + raw_text
-    encoded_images = []
-    for im in images:
-        encoded_images.append(encode_image(im))
+    
+    pil_images = []
+    total_height = 0
+    max_width = 0
+    
+    for img_bytes in images:
+        img = Image.open(img_bytes)
+        pil_images.append(img)
+        total_height += img.height
+        max_width = max(max_width, img.width)
+    
+    # Create new image with combined height
+    combined_image = Image.new('RGB', (max_width, total_height))
+    
+    # Paste images
+    y_offset = 0
+    for img in pil_images:
+        combined_image.paste(img, (0, y_offset))
+        y_offset += img.height
+    
+    # Convert to bytes
+    combined_bytes = BytesIO()
+    combined_image.save(combined_bytes, format='PNG')
+    encoded_image = encode_image(combined_bytes)
 
     messages_content = [
-    {
-        "type": "text",
-        "text": f"{cv_prompt}",
-    }
-]
-
-# Add each image to the messages_content
-    for img in encoded_images:
-        messages_content.append(
-            {
-                "type": "image_url",
-                "image_url": {
-                    "url": f"data:image/jpeg;base64,{img}"
-                },
-            }
-        )
-    # print(cv_prompt)
-    # completion = client.chat.completions.create(
-    #               model='gpt-4o',
-    #               temperature=0,
-    #               response_format={ "type": "json_object" },
-    #               messages=[
-    #                 {"role": "system", "content": "Extract the relevant information from the CV"},
-    #                 {"role": "user", "content": cv_prompt },
-    #             ])
+        {
+            "type": "text",
+            "text": f"{cv_prompt}",
+        }
+    ]
     
-    # response = completion.choices[0].message.content 
-    # print(response) 
+    messages_content.append(
+        {
+            "type": "image_url",
+            "image_url": {
+                "url": f"data:image/jpeg;base64,{encoded_image}"
+            },
+        }
+    )
+        
+
     completion = client.chat.completions.create(
         model="gpt-4o-2024-08-06",
          messages=[
@@ -593,7 +602,6 @@ If description of education or work experience is too large, it doesn't matter. 
 IMPORTANT NOTE:
 If in education only one date is provided, check the other education points and if each of them has only one date, IGNORE DATES, DO NOT RETURN THOSE DATES IN THE RESPONSE, but ONLY IN THAT CASE.
 """
-
 
 
 def calculate_years_months(date1, date2):
