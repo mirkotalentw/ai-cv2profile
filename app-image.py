@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field, ValidationError, field_validator
 from typing import List, Optional
 import fitz  # PyMuPDF
 import streamlit as st
-from datetime import datetime
+from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
 from urllib.parse import urlparse, urlunparse
 import base64
@@ -422,7 +422,7 @@ The output must be in the following JSON format:
             "period": "",
             "periodStart": "",  //must be in the format %d-%m-%Y
             "periodEnd": "",    //must be in the format %d-%m-%Y
-            "totalLength": "",   //total years and months of work experience for that position. Please, calculate it correctly. If the end date is not provided, assume it is the current date {DATETIME}. If the month is not provided, assume it is January for start dates and December for end dates. If it is from Jan 22 to Jan 23, then it is 13 months. Include the last month if it is not full.
+            "totalLength": "",   //total years and months of work experience for that position. Please, calculate it correctly. If the end date is not provided, assume it is the current date {DATETIME}. If the month is not provided, assume it is January for start dates and January for end dates. If it is from Jan 22 to Jan 23, then it is 12 months. DO NOT INCLUDE the last month if it is not full.
             "description": ""
         }
     ],
@@ -433,7 +433,7 @@ The output must be in the following JSON format:
             "period": "",
             "periodStart": "",  //must be in the format %d-%m-%Y
             "periodEnd": "",    //must be in the format %d-%m-%Y
-            "totalLength": "",    //total years and months of studies for that educational degree. Please, calculate it correctly. If the end date is not provided, assume it is the current date {DATETIME}. If the month is not provided, assume it is January for start dates and December for end dates. If it is from Jan 22 to Jan 23, then it is 13 months. Include the last month if it is not full.
+            "totalLength": "",    //total years and months of studies for that educational degree. Please, calculate it correctly. If the end date is not provided, assume it is the current date {DATETIME}. If the month is not provided, assume it is January for start dates and January for end dates. If it is from Jan 22 to Jan 23, then it is 12 months. DO NOT INCLUDE the last month if it is not full.
             "description": ""
         }
     ],
@@ -495,7 +495,7 @@ Example:
     "location": "San Francisco, CA",
     "biography": "Marko is a data scientist with more than 5 years of experience in machine learning and natural language processing. He has a Ph.D. in computer science from Stanford University. He is proficient in Python, TensorFlow, and PyTorch. Marko is a native English speaker.",
     "totalWorkExperience": "5 years 3 months",
-    "totalEducationDuration": "8 years",
+    "totalEducationDuration": "6 years 11 months",
     "workExperience": [
         {
             "jobTitle": "Data Scientist",
@@ -511,8 +511,8 @@ Example:
             "company": "CompanyB",
             "period": "May 2019 - Jan 2023",
             "periodStart": "01-05-2019",
-            "periodEnd": "31-01-2023",
-            "totalLength": "3 years, 9 months",
+            "periodEnd": "01-01-2023",
+            "totalLength": "3 years, 8 months",
             "description": "Working as data analyst for financial reports."
         },
     ],
@@ -520,10 +520,10 @@ Example:
         {
             "degree": "Ph.D. in Computer Science",
             "educationalInstitution": "Stanford University",
-            "period": "2013-2017",
-            "periodStart": "01-01-2013",
-            "periodEnd": "31-12-2017",
-            "totalLength": "4 years",
+            "period": "2019-",
+            "periodStart": "01-01-2019",
+            "periodEnd": "22-11-2024",   // as this is the time of writing the prompt, but current date is {DATETIME}
+            "totalLength": "5 years 11 months",
             "description": ""
         },
         {
@@ -531,8 +531,8 @@ Example:
             "educationalInstitution": "Stanford University",
             "period": "2012-2013",
             "periodStart": "01-01-2012",
-            "periodEnd": "31-12-2013",
-            "totalLength": "2 years",
+            "periodEnd": "01-01-2013",
+            "totalLength": "1 year",
             "description": ""
         },
     ],
@@ -585,22 +585,40 @@ Please, make sure that you know difference between EDUCATION and WORK EXPERIENCE
 
 
 IMPORTANT:
-WHEN CALCULATING TOTALLENGTH FOR SPECIFIC POSITION OR EDUCATION, PLEASE, INCLUDE THE LAST MONTH IF IT IS NOT FULL. 
-EXAMPLE: FEB 2022 - FEB 2023 IS 13 MONTHS, NOT 12 (1 YEAR), SO SOLUTION IS 1 YEAR 1 MONTH, NOT 1 YEAR!
-EXAMPLE 2: 2018 - 2019 IS 2 YEARS, NOT 1 YEAR!
-EXAMPLE 3: JAN 2022 - FEB 2023 IS 14 MONTHS (1 YEAR 2 MONTHS), NOT 1 YEAR 1 MONTH!
+WHEN CALCULATING TOTALLENGTH FOR SPECIFIC POSITION OR EDUCATION, PLEASE, DO NOT INCLUDE THE END MONTH (OR YEAR IF MONTH IS NOT PROVIDED). 
+EXAMPLE: FEB 2022 - FEB 2023 IS 12 MONTHS (1 YEAR), SO SOLUTION IS 1 YEAR!
+EXAMPLE 2: 2018 - 2019 IS 1 YEAR!
+EXAMPLE 3: JAN 2022 - FEB 2023 IS 13 MONTHS (1 YEAR 1 MONTH)!
 
 If something is in the future, calculate it only until today's date {DATETIME}.
 
 Check the examples above and make sure to calculate it correctly! Do not make mistakes!
-User will provide raw text extracted from PDF and images of cv. 
+User will provide raw text extracted from PDF and image of cv. 
 Use raw text for data, as it must be the same as it is in the CV (not summaries or stuff like that).
-Images use only to check the order and to classify things properly. For example, if Junior frontend developer is in Education section, place it in education, do not change stuff like that! THIS IS A MUST AND MUST BE FOLLOWED. YOU CANNOT CHANGE THE ORDER OF POINTS, THEY MUST BE IN THE SAME SECTION AS IN THE CV. IF YOU CANNOT DECIDE WHICH SECTION IS THAT, YOU MUST CHECK ON THE PROVIDED IMAGE. 
+Image use only to check the order and to classify things properly. For example, if Junior frontend developer is in Education section, place it in education, do not change stuff like that! THIS IS A MUST AND MUST BE FOLLOWED. YOU CANNOT CHANGE THE ORDER OF POINTS, THEY MUST BE IN THE SAME SECTION AS IN THE CV. IF YOU CANNOT DECIDE WHICH SECTION IS THAT, YOU MUST CHECK ON THE PROVIDED IMAGE. 
 
 If description of education or work experience is too large, it doesn't matter. You must put the whole description of position. It must be exactly the same as in the uploaded resume. NO SUMMARIES, NO SHORTER VERSIONS, THE ONLY ACCEPTABLE IS TO BE THE SAME AS IN THE CV.
 
 IMPORTANT NOTE:
 If in education only one date is provided, check the other education points and if each of them has only one date, IGNORE DATES, DO NOT RETURN THOSE DATES IN THE RESPONSE, but ONLY IN THAT CASE.
+Common mistake you are making is not extracting periods for education. Please, double check if they exist and correctly extract them if they exist and do proper normalization. Do not make them up, but check in the raw text and on the image if they exist. IF PERIOD EXISTS, YOU MUST FILL NORMALIZED START AND END DATE (IF END DATE IS PROVIDED). Example, you put for period "2019 - " returned as periodStart and periodEnd empty, but this is not acceptable. Correct is then periodStart to be 01-01-2029 and periodEnd to be empty. THIS IS VERY IMPORTANT AND MUST BE CORRECTLY DONE! CHECK SEVERAL TIMES BEFORE PROVIDING PERIODS!
+
+
+VERY IMPORTANT!!!
+IF PERIOD EXISTS, NORMALIZED DATA MUST EXIST TOO. DO NOT MAKE THAT MISTAKE!
+
+Example:
+{
+    "degree": "Primary School",
+    "educationalInstitution": "Primary school 'Karađorđe', Topola",
+    "period": "1993-2001",
+    "periodStart": "",
+    "periodEnd": "",
+    "totalLength": "8 years",
+    "description": ""
+}
+
+THAT IS WRONG! PERIOD START AND END MUST EXIST. CANNOT BE EMPTY. DOUBLE CHECK THOSE STUFF BEFORE PROVIDING THE FINAL RESPONSE.
 """
 
 
@@ -615,6 +633,7 @@ def calculate_years_months(date1, date2):
         d2 = datetime.now()
     else:
         d2 = datetime.strptime(date2, "%d-%m-%Y")
+        d2 = d2 - timedelta(days=1)
     
     years = d2.year - d1.year
     months = d2.month - d1.month
