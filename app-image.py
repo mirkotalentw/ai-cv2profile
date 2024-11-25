@@ -308,6 +308,7 @@ IMPORTANT NOTE FOR DATES:
    - If both a **month** and **year** are provided, use them for `periodStart` or `periodEnd`.
    - If the date is open-ended (e.g., "2021 - ", "to present", "ongoing", or similar), use the **current date** ({DATETIME}) for `periodEnd`.
    - If dates are written in a format like "Sep 2014 - 2018", **DO NOT normalize or assume a missing end month.** Keep the raw period.
+   - Normalize dates to the format DD-MM-YYYY. THIS MUST BE DONE IN THAT FORMAT AND NOT IN ANY OTHER FORMAT NO MATTER WHICH DATE IS USED IN THE PERIOD.
 
 2. **Specific Cases**:
    - If **only years** are mentioned (e.g., "2014 - 2018"), assume the dates are:
