@@ -306,9 +306,9 @@ IMPORTANT NOTE FOR DATES:
 If a work experience or educational experience has only one year mentioned (e.g., "2021 VegalIT Full Stack Developer"), do not assume specific months like January or December. Leave `periodStart` and `periodEnd` fields empty in such cases.
 But if there is a month mentioned, use it. Or if it says to present, now, etc., use current date. Or if it is like "2021 - " AND other work/education experiences are present with both dates, then we assume it is up to present.
 In this cases: Sep 2014 - 2018, DO NOT ASSUME Sep 2014 - Dec 2018., DO NOT NORMALIZE DATES IN THAT CASE, do not calculate totalLength and because of that DO NOT CALCULATE totalEducationDuration/totalWorkExperience (depends for which one is related). But in case that only years are mentioned (eg. 2014 - 2018), then assume Jan 2014 - Jan 2018. DO NOT FORGET THAT THIS MEANS "2019-" TO THE PRESENT DATE! FOLLOW WHOLE INSTRUCTIONS!
-
+IF IT IS ONLY YEARS MENTIONED (eg. 2014 - 2018), THEN ASSUME Jan 2014 - Jan 2018. DO NOT FORGET THAT THIS MEANS "2019-" TO THE PRESENT DATE! Analyze CV image to resolve ambiguities.
 EXAMPLE:
-{
+{   
     "jobTitle": "Full Stack Developer",
     "company": "VegalIT",
     "period": "2021",
