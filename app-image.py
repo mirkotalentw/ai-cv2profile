@@ -305,7 +305,7 @@ Please extract the following details from the CV:
 IMPORTANT NOTE FOR DATES:
 If a work experience or educational experience has only one year mentioned (e.g., "2021 VegalIT Full Stack Developer"), do not assume specific months like January or December. Leave `periodStart` and `periodEnd` fields empty in such cases.
 But if there is a month mentioned, use it. Or if it says to present, now, etc., use current date. Or if it is like "2021 - " AND other work/education experiences are present with both dates, then we assume it is up to present.
-In this cases: Sep 2014 - 2018, DO NOT ASSUME Sep 2014 - Dec 2018., DO NOT NORMALIZE DATES IN THAT CASE, do not calculate totalLength and because of that DO NOT CALCULATE totalEducationDuration/totalWorkExperience (depends for which one is related).
+In this cases: Sep 2014 - 2018, DO NOT ASSUME Sep 2014 - Dec 2018., DO NOT NORMALIZE DATES IN THAT CASE, do not calculate totalLength and because of that DO NOT CALCULATE totalEducationDuration/totalWorkExperience (depends for which one is related). But in case that only years are mentioned, then assume Jan 2014 - Jan 2018.
 
 EXAMPLE:
 {
