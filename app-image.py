@@ -303,20 +303,60 @@ Please extract the following details from the CV:
 - Check the CV image for context and proper classification of sections.
 
 IMPORTANT NOTE FOR DATES:
-If a work experience or educational experience has only one year mentioned (e.g., "2021 VegalIT Full Stack Developer"), do not assume specific months like January or December. Leave `periodStart` and `periodEnd` fields empty in such cases.
-But if there is a month mentioned, use it. Or if it says to present, now, etc., use current date. Or if it is like "2021 - " AND other work/education experiences are present with both dates, then we assume it is up to present.
-In this cases: Sep 2014 - 2018, DO NOT ASSUME Sep 2014 - Dec 2018., DO NOT NORMALIZE DATES IN THAT CASE, do not calculate totalLength and because of that DO NOT CALCULATE totalEducationDuration/totalWorkExperience (depends for which one is related). But in case that only years are mentioned (eg. 2014 - 2018), then assume Jan 2014 - Jan 2018. DO NOT FORGET THAT THIS MEANS "2019-" TO THE PRESENT DATE! FOLLOW WHOLE INSTRUCTIONS!
-IF IT IS ONLY YEARS MENTIONED (eg. 2014 - 2018), THEN ASSUME Jan 2014 - Jan 2018. DO NOT FORGET THAT THIS MEANS "2019-" TO THE PRESENT DATE! Analyze CV image to resolve ambiguities.
-EXAMPLE:
-{   
-    "jobTitle": "Full Stack Developer",
-    "company": "VegalIT",
-    "period": "2021",
-    "periodStart": "",
-    "periodEnd": "",
-    "totalLength": "",
-    "description": "I led the development of the entire software for managing working hours during my internship. ..."
-}
+1. **General Rules for Dates**:
+   - If only one **year** is mentioned (e.g., "2021 VegalIT Full Stack Developer"), leave `periodStart` and `periodEnd` fields **empty**.
+   - If both a **month** and **year** are provided, use them for `periodStart` or `periodEnd`.
+   - If the date is open-ended (e.g., "2021 - ", "to present", "ongoing", or similar), use the **current date** ({DATETIME}) for `periodEnd`.
+   - If dates are written in a format like "Sep 2014 - 2018", **DO NOT normalize or assume a missing end month.** Keep the raw period.
+
+2. **Specific Cases**:
+   - If **only years** are mentioned (e.g., "2014 - 2018"), assume the dates are:
+     - `periodStart`: "01-01-2014"
+     - `periodEnd`: "01-01-2018"
+     - Then calculate the `totalLength` based on this assumption.
+   - If the period is written as "2019 - ", assume:
+     - `periodStart`: "01-01-2019"
+     - `periodEnd`: Current Date ({DATETIME}).
+   - For periods with **incomplete dates** (e.g., "2021"), leave both `periodStart` and `periodEnd` **empty** and exclude it from total duration calculations (`totalWorkExperience` or `totalEducationDuration`).
+
+3. **Total Length Calculations**:
+   - Always calculate `totalLength` for entries with valid `periodStart` and `periodEnd`.
+   - If dates are missing or ambiguous (e.g., only a year is provided), do not calculate `totalLength` for that entry.
+   - Example:
+     - "2017-2020" translates to:
+       - `periodStart`: "01-01-2017"
+       - `periodEnd`: "01-01-2020"
+       - `totalLength`: "3 years".
+     - If only "2017" is mentioned:
+       - `periodStart`: ""
+       - `periodEnd`: ""
+       - `totalLength`: ""
+
+4. **Handling Edge Cases**:
+   - If multiple entries in Work Experience or Education have only years (e.g., "2018 - ", "2020 - Present"), ensure consistency by normalizing as described above.
+   - Use the CV image to resolve ambiguities when deciding whether an entry should be treated as ongoing or closed.
+
+5. **Examples**:
+   - Correct Extraction:
+     {
+         "jobTitle": "IT Support",
+         "company": "NCR Voyix",
+         "period": "19.06.2023 - ",
+         "periodStart": "19-06-2023",
+         "periodEnd": "{DATETIME}",
+         "totalLength": "1 year 6 months",
+         "description": "..."
+     }
+   - Correct Handling of Only Years:
+     {
+         "jobTitle": "Private Tutor",
+         "company": "Adobe Programs",
+         "period": "2017 - 2020",
+         "periodStart": "01-01-2017",
+         "periodEnd": "01-01-2020",
+         "totalLength": "3 years",
+         "description": "..."
+     }
 
 This applies to all experiences where only the year is provided. DO NOT assume a start or end month unless explicitly mentioned in the CV.
 """
