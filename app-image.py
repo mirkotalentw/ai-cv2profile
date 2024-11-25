@@ -247,7 +247,7 @@ Please extract the following details from the CV:
 2. **Work Experience**:
    - Extract all positions with full details:
      - Normalize missing months to January.
-     - If only one date is provided, verify using the CV image to determine if it's the start or end date. If uncertain, ignore.
+     - If only one date is provided, verify using the CV image to determine if it's the start or end date. If uncertain, ignore. If there is only end date, do not assume start date, so only extract end date. In that case it is not possible to calculate totalLength. If at least of one of experiences cannot be calculated, DO NOT calculate totalEducationDuration (leave empty). Check CV image to verify if it is a work experience or education and if it start or end date. If there is a dilemma which date it is, do not make assumptions, leave both dates empty.
      - Assume ongoing roles end today: {DATETIME}.
    - Calculate **totalLength** correctly:
      - Do not include the last month if it's incomplete.
@@ -301,6 +301,22 @@ Please extract the following details from the CV:
 - Validate all durations for accuracy.
 - Ensure periods are normalized to `DD-MM-YYYY` format.
 - Check the CV image for context and proper classification of sections.
+
+IMPORTANT NOTE FOR DATES:
+If a work experience or educational experience has only one year mentioned (e.g., "2021 VegalIT Full Stack Developer"), do not assume specific months like January or December. Leave `periodStart` and `periodEnd` fields empty in such cases.
+But if there is a month mentioned, use it. Or if it says to present, now, etc., use current date. Or if it is like "2021 - " AND other work/education experiences are present with both dates, then we assume it is up to present.
+EXAMPLE:
+{
+    "jobTitle": "Full Stack Developer",
+    "company": "VegalIT",
+    "period": "2021",
+    "periodStart": "",
+    "periodEnd": "",
+    "totalLength": "",
+    "description": "I led the development of the entire software for managing working hours during my internship. ..."
+}
+
+This applies to all experiences where only the year is provided. DO NOT assume a start or end month unless explicitly mentioned in the CV.
 """
 
     
