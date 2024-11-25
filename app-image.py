@@ -311,12 +311,12 @@ IMPORTANT NOTE FOR DATES:
 
 2. **Specific Cases**:
    - If **only years** are mentioned (e.g., "2014 - 2018"), assume the dates are:
-     - `periodStart`: "01-01-2014"
-     - `periodEnd`: "01-01-2018"
+     - `periodStart`: "01-01-2014" #MUST BE IN THE FORMAT DD-MM-YYYY
+     - `periodEnd`: "01-01-2018" #MUST BE IN THE FORMAT DD-MM-YYYY
      - Then calculate the `totalLength` based on this assumption.
    - If the period is written as "2019 - ", assume:
-     - `periodStart`: "01-01-2019"
-     - `periodEnd`: Current Date ({DATETIME}).
+     - `periodStart`: "01-01-2019"  #MUST BE IN THE FORMAT DD-MM-YYYY
+     - `periodEnd`: Current Date ({DATETIME}). #MUST BE IN THE FORMAT DD-MM-YYYY
    - For periods with **incomplete dates** (e.g., "2021"), leave both `periodStart` and `periodEnd` **empty** and exclude it from total duration calculations (`totalWorkExperience` or `totalEducationDuration`).
 
 3. **Total Length Calculations**:
