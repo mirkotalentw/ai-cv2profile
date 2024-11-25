@@ -305,6 +305,7 @@ Please extract the following details from the CV:
 IMPORTANT NOTE FOR DATES:
 If a work experience or educational experience has only one year mentioned (e.g., "2021 VegalIT Full Stack Developer"), do not assume specific months like January or December. Leave `periodStart` and `periodEnd` fields empty in such cases.
 But if there is a month mentioned, use it. Or if it says to present, now, etc., use current date. Or if it is like "2021 - " AND other work/education experiences are present with both dates, then we assume it is up to present.
+In this cases: Sep 2014 - 2018, do not assume Sep 2014 - Dec 2018., do not calculate totalLength and because of that do not calculate totalEducationDuration/totalWorkExperience (depends for which one is related).
 
 EXAMPLE:
 {
@@ -547,11 +548,13 @@ def extract_info_with_gpt(raw_text, prompt, images):
     completion = client.chat.completions.create(
         model="gpt-4o-2024-08-06",
          messages=[
-        {
-            "role": "user",
-            "content": messages_content,
-        }
-    ],
+            {
+                "role": "user",
+                "content": messages_content,
+            }
+        ],
+        temperature=0,
+        top_p=1
     )
 
     response = completion.choices[0].message.content 
