@@ -150,6 +150,159 @@ def fix_url(url):
         parsed_url = urlparse(url)
     
     return urlunparse(parsed_url)
+
+
+prompt = """
+Please extract the following details from the CV:
+
+1. Biography
+2. Work Experience and Education
+3. Total work experience duration
+4. Total education duration
+5. For each position or educational experience:
+   - Job Title or Degree
+   - Company or Institution
+   - Dates (Start and End)
+   - Total Length (years and months)
+   - Description of responsibilities, achievements, or skills gained
+6. Skills
+7. Languages
+8. Publications
+9. Projects
+
+### Output JSON Format
+{
+    "name": "",
+    "emails": [],
+    "phones": [],
+    "links": [],
+    "location": "",
+    "biography": "",
+    "totalWorkExperience": "",
+    "totalEducationDuration": "",
+    "workExperience": [
+        {
+            "jobTitle": "",
+            "company": "",
+            "period": "",
+            "periodStart": "",  # Format: DD-MM-YYYY
+            "periodEnd": "",    # Format: DD-MM-YYYY
+            "totalLength": "",  # Total years and months for the position.
+            "description": ""
+        }
+    ],
+    "education": [
+        {
+            "degree": "",
+            "educationalInstitution": "",
+            "period": "",
+            "periodStart": "",  # Format: DD-MM-YYYY
+            "periodEnd": "",    # Format: DD-MM-YYYY
+            "totalLength": "",  # Total years and months for the degree.
+            "description": ""
+        }
+    ],
+    "skills": [],
+    "languages": [
+        {
+            "name": "",
+            "degree": ""  # Options: Beginner, Good, Fluent, Proficient, Native/Bilingual
+        }
+    ],
+    "publications": [
+        {
+            "date": "",
+            "description": "",
+            "name": "",
+            "periodEnd": "",
+            "periodStart": "",
+            "publisher": "",
+            "tags": [],
+            "url": ""
+        }
+    ],
+    "projects": [
+        {
+            "date": "",
+            "description": "",
+            "name": "",
+            "periodEnd": "",
+            "periodStart": "",
+            "skills": [],
+            "url": ""
+        }
+    ]
+}
+
+### Instructions
+1. Use raw text from the uploaded CV to extract the data exactly as it appears. No summaries, no omissions.
+2. Use the provided image of the CV to:
+   - Verify the classification of sections (e.g., Work Experience vs. Education).
+   - Resolve ambiguities in dates, roles, or descriptions.
+3. Leave fields empty if information is missing.
+
+### Special Rules
+1. **Name, Emails, Phones, Links, and Location**:
+   - Extract from biography or contact information sections. Do not infer.
+2. **Work Experience**:
+   - Extract all positions with full details:
+     - Normalize missing months to January.
+     - If only one date is provided, verify using the CV image to determine if it's the start or end date. If uncertain, ignore.
+     - Assume ongoing roles end today: {DATETIME}.
+   - Calculate **totalLength** correctly:
+     - Do not include the last month if it's incomplete.
+     - Example: Feb 2022 - Feb 2023 = 12 months (1 year).
+   - Include verbatim descriptions of responsibilities and achievements.
+3. **Education**:
+   - Follow the same rules for periods and descriptions as Work Experience.
+   - For degrees with incomplete dates, check if other education entries also lack dates. If all dates are incomplete, leave periods empty. If there is only end date, do not assume start date, so only extract end date. In that case it is not possible to calculate totalLength. If at least of one of experiences cannot be calculated, DO NOT calculate totalEducationDuration (leave empty).
+4. **Skills**:
+   - List only the skill names (e.g., "Python", "SQL"). Exclude qualifiers.
+5. **Languages**:
+   - Normalize proficiency levels to: Beginner, Good, Fluent, Proficient, Native/Bilingual or empty.
+6. **Publications and Projects**:
+   - Extract all details, including dates, description, and relevant URLs.
+   - For Projects, include skills used.
+
+### Examples
+1. Correct Work Experience Format:
+{
+    "jobTitle": "Data Scientist",
+    "company": "CompanyA",
+    "period": "Jan 2023 - ",
+    "periodStart": "01-01-2023",
+    "periodEnd": "",
+    "totalLength": "1 year 7 months",
+    "description": "Working on machine learning and AI projects."
+}
+
+2. Correct Education Format:
+{
+    "degree": "Ph.D. in Computer Science",
+    "educationalInstitution": "Stanford University",
+    "period": "2019 - ",
+    "periodStart": "01-01-2019",
+    "periodEnd": "",
+    "totalLength": "5 years 11 months",
+    "description": ""
+}
+
+3. Correct Skills:
+["Python", "Machine Learning", "Data Analysis"]
+
+4. Correct Languages:
+[
+    {"name": "English", "degree": "Native/Bilingual"},
+    {"name": "Spanish", "degree": "Proficient"}
+]
+
+### Notes
+- **Current Date**: {DATETIME}
+- Validate all durations for accuracy.
+- Ensure periods are normalized to `DD-MM-YYYY` format.
+- Check the CV image for context and proper classification of sections.
+"""
+
     
     
 
@@ -387,239 +540,7 @@ def extract_info_with_gpt(raw_text, prompt, images):
     response = completion.choices[0].message.content 
     return response.strip()
 
-prompt = """
-Please extract the following details from the CV:
 
-Biography
-Work Experience and Education
-Total work experience duration
-Total education duration
-For each position or educational experience:
-Job Title or Degree
-Company or Institution
-Dates (Start and End)
-Total Length (years and months) # This is the total years and months of work experience for that position or educational degree. Please evaluate the total length based on the provided periods.
-Description of responsibilities, achievements, or skills gained
-Skills
-Languages
-Publications
-Projects
-
-The output must be in the following JSON format:
-{
-    "name": "",
-    "emails": [],
-    "phones": [],
-    "links": [],
-    "location": "",
-    "biography": "",
-    "totalWorkExperience": "",
-    "totalEducationDuration": "",
-    "workExperience": [
-        {
-            "jobTitle": "",
-            "company": "",
-            "period": "",
-            "periodStart": "",  //must be in the format %d-%m-%Y
-            "periodEnd": "",    //must be in the format %d-%m-%Y
-            "totalLength": "",   //total years and months of work experience for that position. Please, calculate it correctly. If the end date is not provided, assume it is the current date {DATETIME}. If the month is not provided, assume it is January for start dates and January for end dates. If it is from Jan 22 to Jan 23, then it is 12 months. DO NOT INCLUDE the last month if it is not full.
-            "description": ""
-        }
-    ],
-    "education": [
-        {
-            "degree": "",
-            "educationalInstitution": "",
-            "period": "",
-            "periodStart": "",  //must be in the format %d-%m-%Y
-            "periodEnd": "",    //must be in the format %d-%m-%Y
-            "totalLength": "",    //total years and months of studies for that educational degree. Please, calculate it correctly. If the end date is not provided, assume it is the current date {DATETIME}. If the month is not provided, assume it is January for start dates and January for end dates. If it is from Jan 22 to Jan 23, then it is 12 months. DO NOT INCLUDE the last month if it is not full.
-            "description": ""
-        }
-    ],
-    "skills": [],
-    "languages": [
-        {
-            "name": "",
-            "degree": ""  //options Beginner, Good, Fluent, Proficient, Native/Bilingual
-        }
-    ],
-    "publications": [
-        {
-            "date": "",
-            "description": "",
-            "name": "",
-            "periodEnd": "",
-            "periodStart": "",
-            "publisher": "",
-            "tags": [],
-            "url": ""
-        }
-    ],
-    "projects": [
-        {
-            "date": "",
-            "description": "",
-            "name": "",
-            "periodEnd": "",
-            "periodStart": "",
-            "skills": [],
-            "url": ""
-        }
-    ]
-}
-
-If something is not found, leave the field empty.
-Instructions:
-- name: First and Last name of the candidate
-- emails: List of email addresses of user
-- phones: List of phone numbers of user
-- links: List of links to user's profiles (e.g. LinkedIn, GitHub, Xing, Kaggle, etc.). If there are multiple links, from other sections, like Projects, Publications, please DO NOT include them here!
-- location: City and State of the candidate, please provide it only from biography or data where it is clearly stated, DO NOT EXTRACT IT FROM POSITION OR EDUCATION
-- biography: A brief description of the candidate
-- totalWorkExperience: Total years and months of work experience
-- totalEducationDuration: Total years of education
-- workExperience: List of work experiences with job title, company, period, totalLength (total years and months of work experience for that position) and description
-- education: List of educational experiences with degree, educational institution, period, totalLength (total years and months of studies for that educational degree) and description
-- skills: List of skills (please provide only the skill names, e.g. Python, TensorFlow, etc., without any additional information e.g. CSS – basic knowledge should only be CSS)
-- languages: List of languages with name and degree of proficiency (options: Beginner, Good, Fluent, Proficient, Native/Bilingual), example degree B2 is wrong, it should be Good.
-- publications: List of publications (books, scientific papers, etc.) with date, description, name, periodEnd, periodStart, publisher, tags, and url
-- projects: List of projects (that don't belong to the working experience) with date, description, name, periodEnd, periodStart, skills, and url
-
-Example:
-{
-    "name": "Marko Markovic",
-    "emails": ['marko.markovic@gmail.com'],
-    "phones": ['123-456-7890'],
-    "links": ['https://www.linkedin.com/in/marko-markovic'],
-    "location": "San Francisco, CA",
-    "biography": "Marko is a data scientist with more than 5 years of experience in machine learning and natural language processing. He has a Ph.D. in computer science from Stanford University. He is proficient in Python, TensorFlow, and PyTorch. Marko is a native English speaker.",
-    "totalWorkExperience": "5 years 3 months",
-    "totalEducationDuration": "6 years 11 months",
-    "workExperience": [
-        {
-            "jobTitle": "Data Scientist",
-            "company": "CompanyA",
-            "period": "Jan 2023 - ",
-            "periodStart": "01-01-2023",
-            "periodEnd": "",
-            "totalLength": "1 year, 7 months",
-            "description": "Working as data scientist on NLP projects."
-        },
-        {
-            "jobTitle": "Data Analyst",
-            "company": "CompanyB",
-            "period": "May 2019 - Jan 2023",
-            "periodStart": "01-05-2019",
-            "periodEnd": "01-01-2023",
-            "totalLength": "3 years, 8 months",
-            "description": "Working as data analyst for financial reports."
-        },
-    ],
-    "education": [
-        {
-            "degree": "Ph.D. in Computer Science",
-            "educationalInstitution": "Stanford University",
-            "period": "2019-",
-            "periodStart": "01-01-2019",
-            "periodEnd": "22-11-2024",   // as this is the time of writing the prompt, but current date is {DATETIME}
-            "totalLength": "5 years 11 months",
-            "description": ""
-        },
-        {
-            "degree": "Msc. in Computer Science",
-            "educationalInstitution": "Stanford University",
-            "period": "2012-2013",
-            "periodStart": "01-01-2012",
-            "periodEnd": "01-01-2013",
-            "totalLength": "1 year",
-            "description": ""
-        },
-    ],
-    "skills": ["Python", "TensorFlow", "PyTorch", "NLP", "Machine Learning", "Data Analysis", "OpenCV", "HuggingFace"],
-    "languages": [
-        {
-            "name": "English",
-            "degree": "Native/Bilingual"
-        },
-        {
-            "name": "Spanish",
-            "degree": "Proficient"
-        },
-        {
-            "name": "Italian",
-            "degree": "Beginner"
-        },
-    ],
-    "publications": [
-        {
-            "date": "2022-01-01",
-            "description": "Published a paper on machine learning.",
-            "name": "Machine Learning Paper",
-            "periodEnd": "2022",
-            "periodStart": "2021",
-            "publisher": "IEEE",
-            "tags": ["Machine Learning", "NLP"],
-            "url": "https://www.example.com/paper"
-        }
-    ],
-    "projects": [
-        {
-            "date": "2022-01-01",
-            "description": "Built a chatbot for customer service.",
-            "name": "Customer Service Chatbot",
-            "periodEnd": "2022",
-            "periodStart": "2021",
-            "skills": ["Python", "TensorFlow", "NLP"],
-            "url": "https://www.example.com/chatbot"
-        }
-    ]
-}
-
-Please, make sure to provide all the requested information and that each Work Experience, Education, publication, and project are EXTRACTED from uploaded resume.
-For calculating dates, keep in mind that today it is: {DATETIME}
-Please, provide correct length of work experience and education duration for each position based on the provided periods and provided current date.
-Also, if only one date is provided, check on image if it is start or end date, if you cannot decide or you are not sure, ignore it.
-
-Please, make sure that you know difference between EDUCATION and WORK EXPERIENCE. It is very important to split them correctly!
-
-
-IMPORTANT:
-WHEN CALCULATING TOTALLENGTH FOR SPECIFIC POSITION OR EDUCATION, PLEASE, DO NOT INCLUDE THE END MONTH (OR YEAR IF MONTH IS NOT PROVIDED). 
-EXAMPLE: FEB 2022 - FEB 2023 IS 12 MONTHS (1 YEAR), SO SOLUTION IS 1 YEAR!
-EXAMPLE 2: 2018 - 2019 IS 1 YEAR!
-EXAMPLE 3: JAN 2022 - FEB 2023 IS 13 MONTHS (1 YEAR 1 MONTH)!
-
-If something is in the future, calculate it only until today's date {DATETIME}.
-
-Check the examples above and make sure to calculate it correctly! Do not make mistakes!
-User will provide raw text extracted from PDF and image of cv. 
-Use raw text for data, as it must be the same as it is in the CV (not summaries or stuff like that).
-Image use only to check the order and to classify things properly. For example, if Junior frontend developer is in Education section, place it in education, do not change stuff like that! THIS IS A MUST AND MUST BE FOLLOWED. YOU CANNOT CHANGE THE ORDER OF POINTS, THEY MUST BE IN THE SAME SECTION AS IN THE CV. IF YOU CANNOT DECIDE WHICH SECTION IS THAT, YOU MUST CHECK ON THE PROVIDED IMAGE. 
-
-If description of education or work experience is too large, it doesn't matter. You must put the whole description of position. It must be exactly the same as in the uploaded resume. NO SUMMARIES, NO SHORTER VERSIONS, THE ONLY ACCEPTABLE IS TO BE THE SAME AS IN THE CV.
-
-IMPORTANT NOTE:
-If in education only one date is provided, check the other education points and if each of them has only one date, IGNORE DATES, DO NOT RETURN THOSE DATES IN THE RESPONSE, but ONLY IN THAT CASE.
-Common mistake you are making is not extracting periods for education. Please, double check if they exist and correctly extract them if they exist and do proper normalization. Do not make them up, but check in the raw text and on the image if they exist. IF PERIOD EXISTS, YOU MUST FILL NORMALIZED START AND END DATE (IF END DATE IS PROVIDED). Example, you put for period "2019 - " returned as periodStart and periodEnd empty, but this is not acceptable. Correct is then periodStart to be 01-01-2029 and periodEnd to be empty. THIS IS VERY IMPORTANT AND MUST BE CORRECTLY DONE! CHECK SEVERAL TIMES BEFORE PROVIDING PERIODS!
-
-
-VERY IMPORTANT!!!
-IF PERIOD EXISTS, NORMALIZED DATA MUST EXIST TOO. DO NOT MAKE THAT MISTAKE!
-
-Example:
-{
-    "degree": "Primary School",
-    "educationalInstitution": "Primary school 'Karađorđe', Topola",
-    "period": "1993-2001",
-    "periodStart": "",
-    "periodEnd": "",
-    "totalLength": "8 years",
-    "description": ""
-}
-
-THAT IS WRONG! PERIOD START AND END MUST EXIST. CANNOT BE EMPTY. DOUBLE CHECK THOSE STUFF BEFORE PROVIDING THE FINAL RESPONSE.
-"""
 
 
 def calculate_years_months(date1, date2):
