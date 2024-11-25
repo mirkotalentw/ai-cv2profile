@@ -543,7 +543,7 @@ def extract_raw_text_from_pdf(pdf_file):
     return raw_text
  
 def extract_info_with_gpt(raw_text, prompt, images):
-    cv_prompt = prompt.replace("{DATETIME}", datetime.now().strftime("%Y-%m-%d")) + "\n\n" + raw_text
+    cv_prompt = prompt.replace("{DATETIME}", datetime.now().strftime("%d-%m-%Y")) + "\n\n" + raw_text
     
     pil_images = []
     total_height = 0
